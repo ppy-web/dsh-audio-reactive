@@ -22,7 +22,7 @@
     "./icon": "./assets/icon.svg",
     "./locale/*.json": "./locale/*.json"
   },
-  "files": ["index.js", "lib", "native", "src", "tools/build.mjs", "cordis.patch.yml", "locale", "assets/icon.svg", "assets/detail.svg", "intro.md", "docs", "NOTICE"],
+  "files": ["index.js", "lib", "native", "cordis.patch.yml", "locale", "assets/icon.svg", "assets/detail.svg", "intro.md", "NOTICE"],
   "publishConfig": {
     "access": "public",
     "tag": "latest"
