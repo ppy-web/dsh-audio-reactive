@@ -1,5 +1,7 @@
 # DSH 音频响应
 
+![音频响应：让 DSH 背景随声音起伏](assets/detail.svg)
+
 面向 DeepSeek Harness Web 和 Desktop 的音频响应主题。流式朗读、`dsh-music-panel` 音乐、设备声音、宿主听写（语音输入）与麦克风都可以驱动 audioMotion 频谱。频谱按整个视口居中，放在对话内容后面。
 
 以本地最新 DSH `0.2.2-rc.5`（`2e39e70496`）源码为基线，相关插槽、DOM 锚点、主题令牌与宿主控件样式均按该版本核对。使用 Node.js 24.9+ 和 pnpm 11.28.5。
@@ -7,8 +9,11 @@
 ```sh
 pnpm install --frozen-lockfile
 pnpm check
-pnpm pack
+pnpm release:check
+pnpm pack --pack-destination .release
 ```
+
+打包文件位于 `.release/`。确认版本号后，在仓库根目录运行 `pnpm publish` 发布到 npm（公开包，默认 `latest` 标签）。
 
 安装主题包。已有正常工作的 TTS 联动可以继续使用。音乐联动已对照 `dsh-music-panel@0.37.2` 的两个播放器检查。
 

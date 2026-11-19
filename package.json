@@ -1,9 +1,13 @@
 {
   "name": "dsh-audio-reactive",
   "version": "0.1.2",
-  "private": true,
   "license": "AGPL-3.0-or-later",
   "description": "Audio-reactive visuals for DeepSeek Harness Web and Desktop",
+  "homepage": "https://github.com/ppy-web/dsh-audio-reactive#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ppy-web/dsh-audio-reactive.git"
+  },
   "icon": "./assets/icon.svg",
   "type": "module",
   "packageManager": "pnpm@11.28.5",
@@ -19,6 +23,10 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": ["index.js", "lib", "native", "src", "tools/build.mjs", "cordis.patch.yml", "locale", "assets/icon.svg", "assets/detail.svg", "intro.md", "docs", "NOTICE"],
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  },
   "dsh": {
     "manifestVersion": 1,
     "bundle": { "patch": "./cordis.patch.yml" },
@@ -34,6 +42,7 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "check": "pnpm build && node --test test/*.test.mjs",
+    "release:check": "pnpm check && npm pack --dry-run --ignore-scripts",
     "prepack": "pnpm build"
   },
   "devDependencies": {
