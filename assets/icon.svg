@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">音频响应</title>
+  <rect x="4" y="4" width="248" height="248" rx="56" fill="#14253E"/>
+  <g fill="#A2DCEB">
+    <rect x="46" y="109" width="20" height="38" rx="10"/>
+    <rect x="82" y="93" width="20" height="70" rx="10"/>
+    <rect x="118" y="67" width="20" height="122" rx="10"/>
+    <rect x="154" y="93" width="20" height="70" rx="10"/>
+    <rect x="190" y="109" width="20" height="38" rx="10"/>
+  </g>
+</svg>

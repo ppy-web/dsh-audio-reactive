@@ -1,0 +1,45 @@
+{
+  "name": "dsh-audio-reactive",
+  "version": "0.1.2",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "description": "Audio-reactive visuals for DeepSeek Harness Web and Desktop",
+  "icon": "./assets/icon.svg",
+  "type": "module",
+  "packageManager": "pnpm@11.28.5",
+  "engines": {
+    "node": ">=24.9.0",
+    "dsh": ">=0.2.2-rc.5 <0.3.0-0"
+  },
+  "keywords": ["deepseek-harness", "dsh-plugin", "audio-visualizer"],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./icon": "./assets/icon.svg",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": ["index.js", "lib", "native", "src", "tools/build.mjs", "cordis.patch.yml", "locale", "assets", "intro.md", "docs", "NOTICE"],
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "check": "pnpm build && node --test test/*.test.mjs",
+    "prepack": "pnpm build"
+  },
+  "devDependencies": {
+    "audiomotion-analyzer": "4.5.4",
+    "esbuild": "0.28.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

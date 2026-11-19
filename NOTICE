@@ -1,0 +1,11 @@
+This plugin is licensed under AGPL-3.0-or-later. See LICENSE.
+
+The browser distribution incorporates audioMotion-analyzer 4.5.4, copyright
+Henrique Avila Vianna, licensed under AGPL-3.0-or-later. Its unmodified ESM
+source and license ship in lib/upstream/. The plugin source and its build
+script are also included.
+https://github.com/hvianna/audioMotion-analyzer/tree/4.5.4
+
+The initial bundle structure is based on the DeepSeek Harness decoration
+template, copyright DeepSeek, under the MIT license. See
+docs/DSH-TEMPLATE-LICENSE.txt.
