@@ -1,0 +1,67 @@
+name: Release npm package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.28.5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm install --global npm@11
+      - name: Verify version and select channel
+        id: metadata
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node tools/release-metadata.mjs
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm release:check
+      - name: Pack release
+        run: |
+          mkdir -p "$RUNNER_TEMP/npm-release"
+          pnpm pack --pack-destination "$RUNNER_TEMP/npm-release"
+      - name: Prevent latest from moving backwards
+        if: steps.metadata.outputs.npm_tag == 'latest'
+        env:
+          PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          latest="$(npm view dsh-audio-reactive dist-tags.latest)"
+          if [ -n "$latest" ]; then
+            CURRENT_LATEST="$latest" node --input-type=module <<'NODE'
+          const parse = value => {
+            const match = /^(\d+)\.(\d+)\.(\d+)/u.exec(value)
+            if (!match) throw new Error(`Invalid version: ${value}`)
+            return match.slice(1).map(Number)
+          }
+          const current = parse(process.env.CURRENT_LATEST)
+          const release = parse(process.env.PACKAGE_VERSION)
+          for (let i = 0; i < 3; i++) {
+            if (release[i] > current[i]) break
+            if (release[i] < current[i]) throw new Error('Refusing to move latest backwards')
+          }
+          NODE
+          fi
+      - name: Publish with npm Trusted Publishing
+        env:
+          NPM_TAG: ${{ steps.metadata.outputs.npm_tag }}
+        run: npm publish "$RUNNER_TEMP"/npm-release/*.tgz --provenance --access public --tag "$NPM_TAG"

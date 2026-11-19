@@ -13,7 +13,7 @@ pnpm release:check
 pnpm pack --pack-destination .release
 ```
 
-打包文件位于 `.release/`。确认版本号后，在仓库根目录运行 `pnpm publish` 发布到 npm（公开包，默认 `latest` 标签）。
+打包文件位于 `.release/`。发布时先更新并提交 `package.json` 的版本号，再推送对应的 `v<版本号>` tag；GitHub Actions 会检查、打包并通过 npm Trusted Publishing 发布。稳定版使用 `latest`，预发布版使用 `next`。npm 包设置中的可信发布者须配置为 `ppy-web/dsh-audio-reactive`、工作流 `release.yml`，Environment 留空。
 
 安装主题包。已有正常工作的 TTS 联动可以继续使用。音乐联动已对照 `dsh-music-panel@0.37.2` 的两个播放器检查。
 
