@@ -212,12 +212,13 @@
   width: 100%;
 }
 
+/* Drop the white card fill so rows sit on the host settings surface, while the
+   outline still groups each section. */
 .dsh-ar-panel {
   min-width: 0;
   padding: 0 16px;
   border: 0.5px solid var(--dsw-alias-settings-card-stroke);
   border-radius: var(--dsw-radius-xl);
-  background: var(--dsw-alias-settings-card-fill);
 }
 
 .dsh-ar-rows {
