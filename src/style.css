@@ -269,6 +269,33 @@
   justify-content: flex-end;
 }
 
+.dsh-ar-preset-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dsh-ar-preset-name {
+  box-sizing: border-box;
+  width: 150px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.dsh-ar-preset-name:focus-visible {
+  outline: none;
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
 .dsh-ar-note {
   margin: 0;
   padding: 12px 0;

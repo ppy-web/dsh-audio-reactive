@@ -90,7 +90,7 @@ export const presetKeys = Object.freeze([...new Set(presets.flatMap(preset => Ob
 
 export const general = {
   enabled: flag('启用音频响应', true),
-  preset: choice('效果预设', 'custom', presetChoices),
+  preset: choice('效果预设', 'soft', presetChoices),
   opacity: range('效果能见度', 18, 5, 60, 1, '%'),
   immersive: flag('无操作时进入沉浸模式', true),
   idleSeconds: range('无操作触发时间', 15, 1, 600, 1, '秒'),
@@ -190,8 +190,13 @@ export const defaults = Object.freeze(Object.fromEntries(Object.entries(fields).
 export function applyPreset(current, id) {
   const preset = presets.find(item => item.id === id)
   if (!preset) return { ...current, preset: 'custom' }
+  return applyPresetValues(current, preset.values, id)
+}
+
+/** Apply a preset value map, resetting every preset-controlled key first. */
+export function applyPresetValues(current, values, id = 'custom') {
   const reset = Object.fromEntries(presetKeys.map(key => [key, defaults[key]]))
-  return { ...current, ...reset, ...preset.values, preset: id }
+  return { ...current, ...reset, ...values, preset: id }
 }
 
 export function normalize(input = {}) {
@@ -199,7 +204,8 @@ export function normalize(input = {}) {
   for (const [key, field] of Object.entries(fields)) {
     const value = input?.[key]
     if (field.choices) {
-      if (field.choices.some(([allowed]) => allowed === value)) result[key] = value
+      if (field.choices.some(([allowed]) => allowed === value)
+        || (key === 'preset' && typeof value === 'string' && /^user:.{1,40}$/.test(value))) result[key] = value
     } else if (field.image) {
       if (typeof value === 'string' && (value === '' || /^data:image\/(?:png|jpe?g|webp);base64,/i.test(value))) result[key] = value
     } else if (field.text) {

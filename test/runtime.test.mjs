@@ -247,7 +247,11 @@ test('valid Chinese UI choices persist, and invalid limits stay safe for Web Aud
   assert.equal(defaults.immersive, true)
   assert.equal(defaults.idleSeconds, 15)
   assert.equal(defaults.immersiveUnfocused, true)
-  assert.equal(defaults.preset, 'custom')
+  assert.equal(defaults.preset, 'soft')
+  const soft = presets.find(item => item.id === 'soft')
+  for (const [key, value] of Object.entries(soft.values)) {
+    assert.equal(defaults[key], value, `first-install default should match 默认柔光 (${key})`)
+  }
   assert.equal(defaults.sourceTts, true)
   assert.equal(defaults.sourceMusic, true)
   assert.equal(defaults.sourceDictation, true)
@@ -258,7 +262,7 @@ test('valid Chinese UI choices persist, and invalid limits stay safe for Web Aud
   assert.equal(general.opacity.max, 60)
   assert.equal(defaults.opacity, 18)
   assert.ok(presets.length >= 10)
-  assert.equal(normalize({ preset: 'nope' }).preset, 'custom')
+  assert.equal(normalize({ preset: 'nope' }).preset, 'soft')
   const preset = presets.find(item => item.id === 'neon')
   const applied = normalize({ ...defaults, ...preset.values, preset: preset.id })
   assert.equal(applied.preset, 'neon')

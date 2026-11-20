@@ -1,7 +1,11 @@
-import React, { useEffect, useState, useSyncExternalStore } from 'react'
-import { applyPreset, defaults, general, groups, presets } from './options.js'
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { applyPreset, applyPresetValues, defaults, general, groups, presets } from './options.js'
+import {
+  mergePresets, parsePresetFile, presetValuesFromSettings,
+  sanitizePresetList, serializePresets, USER_PRESET_STORAGE_KEY,
+} from './user-presets.js'
 import { phaseLabels, PreviewIdle, Spectrum } from './spectrum.jsx'
-import { Button, ColorField, ImageField, NumberField, SelectField, SegmentedTabs, SwitchField } from './ui.jsx'
+import { Button, ColorField, ImageField, NumberField, Row, SelectField, SegmentedTabs, SwitchField } from './ui.jsx'
 
 const deviceMessages = {
   off: '手动开启后，频谱会跟随设备播放的声音。',
@@ -18,6 +22,13 @@ const deviceMessages = {
   unavailable: '音频采集未能启动。',
 }
 const sources = { tts: '流式朗读', music: '音乐面板', device: '设备声音', dictation: '语音输入', mic: '麦克风' }
+const PRESET_FILE_NAME = 'dsh-audio-reactive-presets.json'
+function loadUserPresets() {
+  try {
+    const raw = globalThis.localStorage?.getItem(USER_PRESET_STORAGE_KEY)
+    return raw ? sanitizePresetList(JSON.parse(raw)) : []
+  } catch { return [] }
+}
 // Opens a pre-filled GitHub issue so users can request a new audio source.
 const SOURCE_REQUEST_URL = 'https://github.com/ppy-web/dsh-audio-reactive/issues/new?title='
   + encodeURIComponent('音源接入请求：')
@@ -67,6 +78,14 @@ export function Settings({ runtime }) {
   const [previewError, setPreviewError] = useState(false)
   const [peeking, setPeeking] = useState(false)
   const [micDevices, setMicDevices] = useState([])
+  const [userPresets, setUserPresets] = useState(loadUserPresets)
+  const [naming, setNaming] = useState(false)
+  const [presetName, setPresetName] = useState('')
+  const [presetNotice, setPresetNotice] = useState('')
+  const importRef = useRef(null)
+  const currentUserPreset = settings.preset.startsWith('user:')
+    ? userPresets.find(item => `user:${item.name}` === settings.preset)
+    : undefined
 
   // Microphone labels appear only after permission, so refresh the list while
   // the Source tab is open and whenever the capture status changes.
@@ -152,9 +171,82 @@ export function Settings({ runtime }) {
     runtime.setSettings({ ...runtime.getSnapshot().settings, [key]: value })
   }
 
+  const persistUserPresets = list => {
+    const clean = sanitizePresetList(list)
+    setUserPresets(clean)
+    try {
+      globalThis.localStorage?.setItem(USER_PRESET_STORAGE_KEY, JSON.stringify(clean))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const startNaming = () => {
+    setPresetName('')
+    setPresetNotice('')
+    setNaming(true)
+  }
+
+  const cancelNaming = () => {
+    setNaming(false)
+    setPresetName('')
+  }
+
+  const saveCurrentPreset = () => {
+    const name = presetName.trim().slice(0, 40)
+    if (!name) { setPresetNotice('请输入预设名称'); return }
+    const values = presetValuesFromSettings(runtime.getSnapshot().settings)
+    const persisted = persistUserPresets(mergePresets(userPresets, [{ name, values }]))
+    runtime.setSettings(applyPresetValues(runtime.getSnapshot().settings, values, `user:${name}`))
+    setNaming(false)
+    setPresetName('')
+    setPresetNotice(persisted ? `已保存预设「${name}」` : '预设已保存到当前会话，但浏览器未能持久化。')
+  }
+
+  const deleteCurrentPreset = () => {
+    if (!currentUserPreset) return
+    if (typeof globalThis.confirm === 'function'
+      && !globalThis.confirm(`删除预设「${currentUserPreset.name}」？`)) return
+    const persisted = persistUserPresets(userPresets.filter(item => item.name !== currentUserPreset.name))
+    update('preset', 'custom')
+    setPresetNotice(persisted ? `已删除预设「${currentUserPreset.name}」` : '预设已从当前会话删除，但浏览器未能持久化。')
+  }
+
+  const exportPresets = () => {
+    if (!userPresets.length) return
+    const blob = new Blob([serializePresets(userPresets)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = PRESET_FILE_NAME
+    anchor.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    setPresetNotice(`已导出 ${userPresets.length} 个预设`)
+  }
+
+  const importPresets = async event => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const incoming = parsePresetFile(await file.text())
+      const persisted = persistUserPresets(mergePresets(userPresets, incoming))
+      setPresetNotice(persisted
+        ? `已导入 ${incoming.length} 个预设`
+        : '预设已导入当前会话，但浏览器未能持久化。')
+    } catch {
+      setPresetNotice('JSON 文件格式不正确')
+    }
+  }
+
   const changeSetting = (key, next) => {
     const current = runtime.getSnapshot().settings
     if (key === 'preset') {
+      if (next.startsWith('user:')) {
+        const item = userPresets.find(preset => `user:${preset.name}` === next)
+        if (item) { runtime.setSettings(applyPresetValues(current, item.values, next)); return }
+      }
       const preset = presets.find(item => item.id === next)
       if (!preset) { update('preset', 'custom'); return }
       runtime.setSettings(applyPreset(current, next))
@@ -167,7 +259,15 @@ export function Settings({ runtime }) {
     })
   }
 
-  const renderFields = fields => <div className="dsh-ar-rows">
+  const presetChoices = [
+    ['custom', '自定义'],
+    ...presets.map(preset => [preset.id, preset.label]),
+    ...userPresets.map(preset => [`user:${preset.name}`, `我的：${preset.name}`]),
+  ]
+  const displayFields = Object.fromEntries(Object.entries(general).filter(([key]) => key !== 'preset'))
+
+  const renderFields = (fields, leading) => <div className="dsh-ar-rows">
+    {leading}
     {Object.entries(fields).map(([key, field]) => {
       const id = `dsh-ar-field-${key}`
       const off = IMMERSIVE_KEYS.has(key) && !settings.immersive
@@ -190,7 +290,8 @@ export function Settings({ runtime }) {
         return <ColorField key={key} id={id} label={field.label} description={description} value={value} disabled={disabled} onChange={onChange} />
       }
       if (field.choices) {
-        return <SelectField key={key} id={id} label={field.label} description={description} value={value} choices={field.choices} disabled={disabled} onChange={onChange} />
+        return <SelectField key={key} id={id} label={field.label} description={description} value={value}
+          choices={key === 'preset' ? presetChoices : field.choices} disabled={disabled} onChange={onChange} />
       }
       return <NumberField key={key} id={id} label={field.label} description={description} value={value}
         min={field.min} max={field.max} step={field.step} unit={field.unit} disabled={disabled} onChange={onChange} />
@@ -210,6 +311,33 @@ export function Settings({ runtime }) {
   if (settings.micDevice && !micDevices.some(([id]) => id === settings.micDevice)) {
     micChoices.push([settings.micDevice, '已选设备（可能不可用）'])
   }
+
+  const presetTools = <>
+    <SelectField id="dsh-ar-field-preset" label="效果预设" value={settings.preset}
+      choices={presetChoices} description="选择内置预设或你保存的效果"
+      onChange={next => changeSetting('preset', next)} />
+    <Row label="预设管理" description={presetNotice || '保存当前效果，或导入/导出 JSON 文件'}>
+      <div className="dsh-ar-preset-controls">
+        {naming ? <>
+          <input className="dsh-ar-preset-name" value={presetName} maxLength={40} placeholder="预设名称" aria-label="预设名称"
+            onChange={event => setPresetName(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') { event.preventDefault(); saveCurrentPreset() }
+              else if (event.key === 'Escape') { event.preventDefault(); cancelNaming() }
+            }} autoFocus />
+          <Button variant="primary" size="sm" onClick={saveCurrentPreset}>保存</Button>
+          <Button variant="ghost" size="sm" onClick={cancelNaming}>取消</Button>
+        </> : <>
+          <Button variant="outline" size="sm" onClick={startNaming}>保存当前…</Button>
+          <Button variant="ghost" size="sm" disabled={!userPresets.length} onClick={exportPresets}>导出</Button>
+          <Button variant="ghost" size="sm" onClick={() => importRef.current?.click()}>导入</Button>
+          {currentUserPreset ? <Button variant="ghost" size="sm" onClick={deleteCurrentPreset}>删除</Button> : null}
+        </>}
+        <input ref={importRef} type="file" accept="application/json,.json" hidden
+          onChange={event => { void importPresets(event) }} />
+      </div>
+    </Row>
+  </>
 
   const sourcePanel = <div className="dsh-ar-rows">
     {!settings.enabled && <div className="dsh-ar-row">
@@ -281,7 +409,9 @@ export function Settings({ runtime }) {
     {saveFailed && <p className="dsh-ar-alert" role="alert">设置已临时生效，浏览器未能保存。重载后将恢复上次保存的设置。</p>}
     {TABS.map(entry => <div key={entry.value} className="dsh-ar-panel" id={entry.panelId} role="tabpanel"
       aria-labelledby={entry.id} hidden={entry.value !== tab}>
-      {entry.value === 'source' ? sourcePanel : renderFields(entry.value === 'display' ? general : entry.fields)}
+      {entry.value === 'source'
+        ? sourcePanel
+        : renderFields(entry.value === 'display' ? displayFields : entry.fields, entry.value === 'display' ? presetTools : null)}
     </div>)}
   </section>
 }
