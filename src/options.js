@@ -91,18 +91,18 @@ export const presetKeys = Object.freeze([...new Set(presets.flatMap(preset => Ob
 export const general = {
   enabled: flag('启用音频响应', true),
   preset: choice('效果预设', 'soft', presetChoices),
-  opacity: range('效果能见度', 18, 5, 60, 1, '%'),
-  immersive: flag('无操作时进入沉浸模式', true),
-  idleSeconds: range('无操作触发时间', 15, 1, 600, 1, '秒'),
-  immersiveUnfocused: flag('失去焦点时保持沉浸模式', true),
-  fadeMs: range('淡入淡出时长', 360, 0, 1500, 10, '毫秒'),
+  opacity: range('能见度', 18, 5, 60, 1, '%'),
+  immersive: flag('启用沉浸模式', true),
+  idleSeconds: range('触发延时', 15, 1, 600, 1, '秒'),
+  fadeMs: range('淡入淡出', 360, 0, 1500, 10, '毫秒'),
+  immersiveUnfocused: flag('离开DSH保持沉浸', true),
   immersiveOpacity: range('背景透明度', 90, 0, 100, 1, '%'),
   immersiveBlur: range('背景模糊', 5, 0, 60, 1, '像素'),
   immersiveImage: image('自定义背景图'),
-  immersiveFit: choice('背景铺放方式', 'cover', [
+  immersiveFit: choice('背景图铺放', 'cover', [
     ['cover', '铺满裁切'], ['contain', '完整显示'], ['fill', '拉伸铺满'], ['center', '原始大小居中'], ['tile', '平铺'],
   ]),
-  immersiveScale: range('背景缩放', 100, 50, 200, 1, '%'),
+  immersiveScale: range('背景图缩放', 100, 50, 200, 1, '%'),
 }
 
 // Source-selection flags live in the Source tab. They are normal persisted

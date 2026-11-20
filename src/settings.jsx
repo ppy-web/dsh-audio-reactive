@@ -264,38 +264,40 @@ export function Settings({ runtime }) {
     ...presets.map(preset => [preset.id, preset.label]),
     ...userPresets.map(preset => [`user:${preset.name}`, `我的：${preset.name}`]),
   ]
-  const displayFields = Object.fromEntries(Object.entries(general).filter(([key]) => key !== 'preset'))
+
+  const renderField = (key, field, options = {}) => {
+    const id = `dsh-ar-field-${key}`
+    const off = IMMERSIVE_KEYS.has(key) && !settings.immersive
+    const noImage = IMAGE_KEYS.has(key) && !settings.immersiveImage
+    const disabled = off || noImage
+    const baseHint = key === 'immersiveOpacity' ? '数值越高，背景越透明'
+      : key === 'immersiveBlur' ? '模糊背景画面' : undefined
+    const hint = options.hint ?? baseHint
+    const description = off
+      ? '启用沉浸模式后可调'
+      : noImage ? '上传背景图后可调' : hint
+    const value = settings[key]
+    const onChange = next => { changeSetting(key, next) }
+    if (typeof field.value === 'boolean') {
+      return <SwitchField key={key} id={id} label={field.label} description={description} value={value} disabled={disabled} onChange={onChange} />
+    }
+    if (field.image) {
+      return <ImageField key={key} id={id} label={field.label} description={description} value={value} disabled={disabled} onChange={onChange} />
+    }
+    if (field.color) {
+      return <ColorField key={key} id={id} label={field.label} description={description} value={value} disabled={disabled} onChange={onChange} />
+    }
+    if (field.choices) {
+      return <SelectField key={key} id={id} label={field.label} description={description} value={value}
+        choices={options.choices ?? field.choices} disabled={disabled} onChange={onChange} />
+    }
+    return <NumberField key={key} id={id} label={field.label} description={description} value={value}
+      min={field.min} max={field.max} step={field.step} unit={field.unit} disabled={disabled} onChange={onChange} />
+  }
 
   const renderFields = (fields, leading) => <div className="dsh-ar-rows">
     {leading}
-    {Object.entries(fields).map(([key, field]) => {
-      const id = `dsh-ar-field-${key}`
-      const off = IMMERSIVE_KEYS.has(key) && !settings.immersive
-      const noImage = IMAGE_KEYS.has(key) && !settings.immersiveImage
-      const disabled = off || noImage
-      const hint = key === 'immersiveOpacity' ? '数值越高，背景越透明'
-        : key === 'immersiveBlur' ? '模糊背景画面' : undefined
-      const description = off
-        ? '开启「无操作时进入沉浸模式」后可调'
-        : noImage ? '上传背景图后可调' : hint
-      const value = settings[key]
-      const onChange = next => { changeSetting(key, next) }
-      if (typeof field.value === 'boolean') {
-        return <SwitchField key={key} id={id} label={field.label} description={description} value={value} disabled={disabled} onChange={onChange} />
-      }
-      if (field.image) {
-        return <ImageField key={key} id={id} label={field.label} description={description} value={value} disabled={disabled} onChange={onChange} />
-      }
-      if (field.color) {
-        return <ColorField key={key} id={id} label={field.label} description={description} value={value} disabled={disabled} onChange={onChange} />
-      }
-      if (field.choices) {
-        return <SelectField key={key} id={id} label={field.label} description={description} value={value}
-          choices={key === 'preset' ? presetChoices : field.choices} disabled={disabled} onChange={onChange} />
-      }
-      return <NumberField key={key} id={id} label={field.label} description={description} value={value}
-        min={field.min} max={field.max} step={field.step} unit={field.unit} disabled={disabled} onChange={onChange} />
-    })}
+    {Object.entries(fields).map(([key, field]) => renderField(key, field))}
   </div>
 
   const dictationDesc = !settings.sourceDictation ? '已关闭，不跟随宿主听写'
@@ -312,31 +314,51 @@ export function Settings({ runtime }) {
     micChoices.push([settings.micDevice, '已选设备（可能不可用）'])
   }
 
-  const presetTools = <>
-    <SelectField id="dsh-ar-field-preset" label="效果预设" value={settings.preset}
-      choices={presetChoices} description="选择内置预设或你保存的效果"
-      onChange={next => changeSetting('preset', next)} />
-    <Row label="预设管理" description={presetNotice || '保存当前效果，或导入/导出 JSON 文件'}>
-      <div className="dsh-ar-preset-controls">
-        {naming ? <>
-          <input className="dsh-ar-preset-name" value={presetName} maxLength={40} placeholder="预设名称" aria-label="预设名称"
-            onChange={event => setPresetName(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter') { event.preventDefault(); saveCurrentPreset() }
-              else if (event.key === 'Escape') { event.preventDefault(); cancelNaming() }
-            }} autoFocus />
-          <Button variant="primary" size="sm" onClick={saveCurrentPreset}>保存</Button>
-          <Button variant="ghost" size="sm" onClick={cancelNaming}>取消</Button>
-        </> : <>
-          <Button variant="outline" size="sm" onClick={startNaming}>保存当前…</Button>
-          <Button variant="ghost" size="sm" disabled={!userPresets.length} onClick={exportPresets}>导出</Button>
-          <Button variant="ghost" size="sm" onClick={() => importRef.current?.click()}>导入</Button>
-          {currentUserPreset ? <Button variant="ghost" size="sm" onClick={deleteCurrentPreset}>删除</Button> : null}
-        </>}
-        <input ref={importRef} type="file" accept="application/json,.json" hidden
-          onChange={event => { void importPresets(event) }} />
-      </div>
-    </Row>
+  const presetManageRow = <Row label="预设管理" description={presetNotice || '保存当前效果，或导入/导出 JSON 文件'}>
+    <div className="dsh-ar-preset-controls">
+      {naming ? <>
+        <input className="dsh-ar-preset-name" value={presetName} maxLength={40} placeholder="预设名称" aria-label="预设名称"
+          onChange={event => setPresetName(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') { event.preventDefault(); saveCurrentPreset() }
+            else if (event.key === 'Escape') { event.preventDefault(); cancelNaming() }
+          }} autoFocus />
+        <Button variant="primary" size="sm" onClick={saveCurrentPreset}>保存</Button>
+        <Button variant="ghost" size="sm" onClick={cancelNaming}>取消</Button>
+      </> : <>
+        <Button variant="outline" size="sm" onClick={startNaming}>保存当前…</Button>
+        <Button variant="ghost" size="sm" disabled={!userPresets.length} onClick={exportPresets}>导出</Button>
+        <Button variant="ghost" size="sm" onClick={() => importRef.current?.click()}>导入</Button>
+        {currentUserPreset ? <Button variant="ghost" size="sm" onClick={deleteCurrentPreset}>删除</Button> : null}
+      </>}
+      <input ref={importRef} type="file" accept="application/json,.json" hidden
+        onChange={event => { void importPresets(event) }} />
+    </div>
+  </Row>
+
+  const basicSettings = <>
+    <div className="dsh-ar-group-head"><div className="dsh-ar-group-label">基础设置</div></div>
+    <div className="dsh-ar-rows">
+      {renderField('enabled', general.enabled)}
+      {renderField('preset', general.preset, { choices: presetChoices, hint: '选择内置预设或你保存的效果' })}
+      {renderField('opacity', general.opacity)}
+      {presetManageRow}
+    </div>
+  </>
+
+  const immersiveSettings = <>
+    <div className="dsh-ar-group-head"><div className="dsh-ar-group-label">沉浸模式</div></div>
+    <div className="dsh-ar-rows">
+      {renderField('immersive', general.immersive, { hint: '无操作时自动进入全屏沉浸模式' })}
+      {renderField('idleSeconds', general.idleSeconds)}
+      {renderField('fadeMs', general.fadeMs)}
+      {renderField('immersiveUnfocused', general.immersiveUnfocused)}
+      {renderField('immersiveOpacity', general.immersiveOpacity)}
+      {renderField('immersiveBlur', general.immersiveBlur)}
+      {renderField('immersiveImage', general.immersiveImage)}
+      {renderField('immersiveFit', general.immersiveFit)}
+      {renderField('immersiveScale', general.immersiveScale)}
+    </div>
   </>
 
   const sourcePanel = <div className="dsh-ar-rows">
@@ -411,7 +433,7 @@ export function Settings({ runtime }) {
       aria-labelledby={entry.id} hidden={entry.value !== tab}>
       {entry.value === 'source'
         ? sourcePanel
-        : renderFields(entry.value === 'display' ? displayFields : entry.fields, entry.value === 'display' ? presetTools : null)}
+        : entry.value === 'display' ? <>{basicSettings}{immersiveSettings}</> : renderFields(entry.fields)}
     </div>)}
   </section>
 }
