@@ -414,10 +414,38 @@ export function Settings({ runtime }) {
     <p className="dsh-ar-note">同一时刻只显示一个来源：听写和手动设备采集优先，其次是流式朗读、音乐面板和麦克风，避免同一段声音被重复计算。听写时插件会共享默认输入设备，不会干扰宿主录音。</p>
   </div>
 
+  // Mirror the immersive background treatments (fit, scale, blur and the
+  // transparency veil) inside the preview so it matches the real overlay.
+  const previewImage = settings.immersiveImage
+  const previewSurface = previewImage ? { backgroundColor: 'var(--dsw-alias-bg-base, #fff)' } : undefined
+  const previewFit = settings.immersiveFit
+  const previewImageStyle = previewImage ? {
+    position: 'absolute',
+    inset: '-16px',
+    pointerEvents: 'none',
+    transformOrigin: 'center',
+    backgroundImage: `url("${previewImage}")`,
+    backgroundSize: previewFit === 'fill' ? '100% 100%' : previewFit === 'center' || previewFit === 'tile' ? 'auto' : previewFit,
+    backgroundRepeat: previewFit === 'tile' ? 'repeat' : 'no-repeat',
+    backgroundPosition: 'center',
+    filter: settings.immersiveBlur > 0 ? `blur(${settings.immersiveBlur}px)` : undefined,
+    transform: `scale(${settings.immersiveScale / 100})`,
+  } : undefined
+  const previewVeilStyle = previewImage ? {
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none',
+    backgroundColor: `color-mix(in srgb, var(--dsw-alias-bg-base, #fff) ${100 - settings.immersiveOpacity}%, transparent)`,
+  } : undefined
+
   return <section className="dsh-ar-settings" {...(peeking ? {} : { 'data-dsh-ar-settings': '' })}>
     <div className="dsh-ar-top">
-      <div className="dsh-ar-preview">
-        {source && !reducedMotion ? <Spectrum source={source} settings={settings} reportError={setPreviewError} /> : <PreviewIdle />}
+      <div className="dsh-ar-preview" style={previewSurface}>
+        {previewImage ? <>
+          <div className="dsh-ar-preview-image" aria-hidden="true" style={previewImageStyle} />
+          <div className="dsh-ar-preview-veil" aria-hidden="true" style={previewVeilStyle} />
+        </> : null}
+        {source && !reducedMotion ? <Spectrum source={source} settings={settings} reportError={setPreviewError} /> : previewImage ? null : <PreviewIdle />}
         <p className="dsh-ar-preview-status" role="status">{status}</p>
         <div className="dsh-ar-preview-actions">
           <Button variant="ghost" size="sm" className="dsh-ar-preview-button" icon={<PeekIcon />} title="按住查看对话区的实时效果" {...peekHandlers}>按住透视</Button>
