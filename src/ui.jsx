@@ -152,16 +152,20 @@ export function SelectField({ id, label, description, value, choices, disabled, 
       : { top: 8, bottom: window.innerHeight - 8, left: 8, right: window.innerWidth - 8 }
     const margin = 12
     const width = Math.max(box.width, 160)
-    const maxAllowed = Math.max(80, Math.min(320, bounds.bottom - bounds.top - margin * 2))
+    const maxAllowed = Math.max(80, Math.min(260, bounds.bottom - bounds.top - margin * 2))
     const desired = choices.length * 34 + 8
     const below = bounds.bottom - margin - (box.bottom + 4)
     const above = (box.top - 4) - (bounds.top + margin)
-    const useBelow = below >= above
+    // Prefer opening downward; only flip up when there is not enough room for
+    // a usable list below.
+    const useBelow = below >= Math.min(desired, 260) || below >= 120
     const available = Math.max(0, useBelow ? below : above)
     const maxHeight = Math.max(80, Math.min(desired, maxAllowed, available))
     setRect({
       left: Math.max(bounds.left + margin, Math.min(box.left, bounds.right - margin - width)),
-      top: useBelow ? box.bottom + 4 : box.top - 4 - maxHeight,
+      top: useBelow
+        ? Math.min(box.bottom + 4, bounds.bottom - margin - maxHeight)
+        : Math.max(bounds.top + margin, box.top - 4 - maxHeight),
       width,
       maxHeight,
     })

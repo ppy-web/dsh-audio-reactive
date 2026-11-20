@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
-import { defaults, general, groups, normalize, presets } from '../src/options.js'
+import { applyPreset, defaults, general, groups, normalize, presetKeys, presets } from '../src/options.js'
 import { createRuntime } from '../src/runtime.js'
 
 function browserFixture() {
@@ -162,6 +162,39 @@ test('host settings and reduced motion keep the idle overlay closed', () => {  c
   dispose()
 })
 
+test('immersion can keep running while another app has focus, unless the option is off', () => {
+  const fixture = browserFixture()
+  const runtime = createRuntime(fixture.win, fixture.doc)
+  const source = {}
+  const dispose = runtime.start()
+  runtime.setPlayback({ getPcmPlaybackSource: () => source })
+  runtime.setSettings({ ...defaults, immersive: true, idleSeconds: 5, immersiveUnfocused: true })
+  fixture.at(1_000)
+  fixture.doc.hasFocus = () => false
+  fixture.win.dispatchEvent(new Event('blur'))
+  fixture.at(6_500)
+  assert.equal(runtime.getSnapshot().immersive, true)
+
+  runtime.setSettings({ ...defaults, immersive: true, idleSeconds: 5, immersiveUnfocused: false })
+  fixture.doc.hasFocus = () => true
+  fixture.at(7_000)
+  fixture.doc.hasFocus = () => false
+  fixture.win.dispatchEvent(new Event('blur'))
+  fixture.at(20_000)
+  assert.equal(runtime.getSnapshot().immersive, false)
+
+  // A hidden page (minimized / tab hidden) still dismisses, even with the option on.
+  runtime.setSettings({ ...defaults, immersive: true, idleSeconds: 5, immersiveUnfocused: true })
+  fixture.doc.hasFocus = () => true
+  fixture.at(21_000)
+  fixture.at(27_000)
+  assert.equal(runtime.getSnapshot().immersive, true)
+  fixture.doc.hidden = true
+  fixture.doc.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(runtime.getSnapshot().immersive, false)
+  dispose()
+})
+
 test('every capsule-select field has a label, a usable default and labeled options', () => {
   const fields = { ...general, ...Object.assign({}, ...groups.map(([, entries]) => entries)) }
   const choiceFields = Object.entries(fields).filter(([, field]) => field.choices)
@@ -175,6 +208,22 @@ test('every capsule-select field has a label, a usable default and labeled optio
   assert.equal(new Set(ids).size, ids.length)
   for (const preset of presets) {
     assert.equal(normalize({ ...defaults, ...preset.values, preset: preset.id }).preset, preset.id)
+  }
+})
+
+test('switching between presets never leaks a value from the previous preset', () => {
+  const ids = presets.map(preset => preset.id)
+  for (const from of ids) {
+    const start = normalize(applyPreset({ ...defaults }, from))
+    for (const to of ids) {
+      const switched = normalize(applyPreset(start, to))
+      const target = presets.find(preset => preset.id === to)
+      const expected = normalize({ ...defaults, ...target.values, preset: to })
+      for (const key of presetKeys) {
+        assert.equal(switched[key], expected[key], `${from} -> ${to} leaked ${key}`)
+      }
+      assert.equal(switched.preset, to)
+    }
   }
 })
 
@@ -197,6 +246,7 @@ test('valid Chinese UI choices persist, and invalid limits stay safe for Web Aud
   assert.equal(defaults.immersiveImage, '')
   assert.equal(defaults.immersive, true)
   assert.equal(defaults.idleSeconds, 15)
+  assert.equal(defaults.immersiveUnfocused, true)
   assert.equal(defaults.preset, 'custom')
   assert.equal(defaults.sourceTts, true)
   assert.equal(defaults.sourceMusic, true)

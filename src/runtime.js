@@ -83,7 +83,11 @@ export function createRuntime(win, doc) {
     const micSource = mic.read({ dictation, manual, device: settings.micDevice })
     if (dictation && micSource) { source = micSource; sourceKind = 'dictation' }
     else if (manual && micSource) { source = micSource; sourceKind = 'mic' }
-    const blocked = !settings.immersive || !source || !!phase || motion.matches || !doc.hasFocus()
+    // Losing window focus only blocks immersion unless the user opts into
+    // keeping it while working in another app. A hidden page still stops it:
+    // the overlay could not be seen and background capture should wind down.
+    const blocked = !settings.immersive || !source || !!phase || motion.matches
+      || (!settings.immersiveUnfocused && !doc.hasFocus())
       || !!doc.querySelector(HOST_DIALOG)
     if (blocked) armedAt = undefined
     const now = win.performance.now()
@@ -113,6 +117,13 @@ export function createRuntime(win, doc) {
   }
 
   function onVisibility() { dismiss(); refresh() }
+  // Switching apps blurs the window. With the option on, keep the current
+  // overlay and idle count instead of treating the blur as user activity;
+  // visibilitychange (tab hidden / minimized) still dismisses through onVisibility.
+  function onBlur() {
+    if (!snapshot.settings.immersiveUnfocused) dismiss()
+    refresh()
+  }
   function onActivity(event) {
     dismiss()
     if (event.type === 'keydown' || event.type === 'pointerdown') music.unlock()
@@ -151,7 +162,7 @@ export function createRuntime(win, doc) {
       started = true
       for (const event of ACTIVITY_EVENTS) win.addEventListener(event, onActivity, { capture: true, passive: true })
       doc.addEventListener('visibilitychange', onVisibility)
-      win.addEventListener('blur', onVisibility)
+      win.addEventListener('blur', onBlur)
       win.addEventListener('storage', onStorage)
       motion.addEventListener('change', onVisibility)
       syncTimer()
@@ -160,7 +171,7 @@ export function createRuntime(win, doc) {
         syncTimer()
         for (const event of ACTIVITY_EVENTS) win.removeEventListener(event, onActivity, true)
         doc.removeEventListener('visibilitychange', onVisibility)
-        win.removeEventListener('blur', onVisibility)
+        win.removeEventListener('blur', onBlur)
         win.removeEventListener('storage', onStorage)
         motion.removeEventListener('change', onVisibility)
         dismiss()

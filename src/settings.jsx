@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useSyncExternalStore } from 'react'
-import { defaults, general, groups, presets } from './options.js'
+import { applyPreset, defaults, general, groups, presets } from './options.js'
 import { phaseLabels, PreviewIdle, Spectrum } from './spectrum.jsx'
 import { Button, ColorField, ImageField, NumberField, SelectField, SegmentedTabs, SwitchField } from './ui.jsx'
 
@@ -18,6 +18,9 @@ const deviceMessages = {
   unavailable: '音频采集未能启动。',
 }
 const sources = { tts: '流式朗读', music: '音乐面板', device: '设备声音', dictation: '语音输入', mic: '麦克风' }
+// Opens a pre-filled GitHub issue so users can request a new audio source.
+const SOURCE_REQUEST_URL = 'https://github.com/ppy-web/dsh-audio-reactive/issues/new?title='
+  + encodeURIComponent('音源接入请求：')
 const micMessages = {
   off: '开启后采集默认输入设备，可作为独立音源',
   starting: '正在开启麦克风…',
@@ -50,7 +53,7 @@ const TABS = TAB_DEFINITIONS.map(tab => ({
 
 // Immersive-only controls stay disabled until the immersive mode is on.
 const IMMERSIVE_KEYS = new Set([
-  'idleSeconds', 'fadeMs', 'immersiveOpacity', 'immersiveBlur',
+  'idleSeconds', 'immersiveUnfocused', 'fadeMs', 'immersiveOpacity', 'immersiveBlur',
   'immersiveImage', 'immersiveFit', 'immersiveScale',
 ])
 const IMAGE_KEYS = new Set(['immersiveFit', 'immersiveScale'])
@@ -154,16 +157,7 @@ export function Settings({ runtime }) {
     if (key === 'preset') {
       const preset = presets.find(item => item.id === next)
       if (!preset) { update('preset', 'custom'); return }
-      // Clear side-channel gradient state unless the preset defines its own,
-      // so switching away from a dual-channel preset cannot leave it behind.
-      runtime.setSettings({
-        ...current,
-        splitGradient: false,
-        gradientLeft: '',
-        gradientRight: '',
-        ...preset.values,
-        preset: next,
-      })
+      runtime.setSettings(applyPreset(current, next))
       return
     }
     runtime.setSettings({
@@ -227,7 +221,13 @@ export function Settings({ runtime }) {
         <Button variant="outline" size="sm" onClick={() => setTab('display')}>去开启</Button>
       </div>
     </div>}
-    <div className="dsh-ar-group-label">音源</div>
+    <div className="dsh-ar-group-head">
+      <div className="dsh-ar-group-label">音源</div>
+      <a className="dsh-ar-group-link" href={SOURCE_REQUEST_URL} target="_blank" rel="noopener noreferrer">
+        我要接入音源
+        <span className="dsh-ar-group-link-arrow" aria-hidden="true">→</span>
+      </a>
+    </div>
     <SwitchField id="dsh-ar-field-sourceTts" label="流式朗读（dsh-xiaomi-tts）" value={settings.sourceTts}
       disabled={!settings.enabled} onChange={next => changeSetting('sourceTts', next)}
       description={sourceKind === 'tts' ? '正在响应流式朗读' : settings.sourceTts ? '朗读回复时自动接入 TTS 音频' : '已关闭'} />
@@ -246,7 +246,9 @@ export function Settings({ runtime }) {
       choices={micChoices} disabled={!settings.enabled || !(settings.micEnabled || settings.sourceDictation)}
       description="听写与麦克风可视化使用的输入设备"
       onChange={next => changeSetting('micDevice', next)} />
-    <div className="dsh-ar-group-label">设备声音</div>
+    <div className="dsh-ar-group-head">
+      <div className="dsh-ar-group-label">设备声音</div>
+    </div>
     <div className="dsh-ar-row">
       <div className="dsh-ar-row-text">
         <div className="dsh-ar-row-title">采集播放输出</div>

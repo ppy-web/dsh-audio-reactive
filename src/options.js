@@ -71,7 +71,7 @@ export const presets = [
   },
   {
     id: 'pixel', label: '像素方块',
-    values: { mode: 0, gradient: 'steelblue', colorMode: 'gradient', fillAlpha: 0.8, barSpace: 0.05, roundBars: false, lumiBars: true, ledBars: false, reflexRatio: 0, radial: false, radialInvert: false, mirror: 0, showPeaks: false },
+    values: { mode: 4, channelLayout: 'single', gradient: 'rainbow', colorMode: 'bar-index', fillAlpha: 0.92, barSpace: 0.25, roundBars: false, ledBars: true, trueLeds: true, lumiBars: false, alphaBars: false, outlineBars: false, loRes: true, showBgColor: false, smoothing: 0.2, reflexRatio: 0, radial: false, radialInvert: false, mirror: 0, showPeaks: false },
   },
   {
     id: 'city', label: '城市脉冲',
@@ -83,6 +83,10 @@ export const presets = [
   },
 ]
 const presetChoices = [['custom', '自定义'], ...presets.map(preset => [preset.id, preset.label])]
+// Every key any preset can write. A preset application resets these keys to
+// their defaults first, so switching presets cannot inherit stale values from
+// the previous one.
+export const presetKeys = Object.freeze([...new Set(presets.flatMap(preset => Object.keys(preset.values)))])
 
 export const general = {
   enabled: flag('启用音频响应', true),
@@ -90,6 +94,7 @@ export const general = {
   opacity: range('效果能见度', 18, 5, 60, 1, '%'),
   immersive: flag('无操作时进入沉浸模式', true),
   idleSeconds: range('无操作触发时间', 15, 1, 600, 1, '秒'),
+  immersiveUnfocused: flag('失去焦点时保持沉浸模式', true),
   fadeMs: range('淡入淡出时长', 360, 0, 1500, 10, '毫秒'),
   immersiveOpacity: range('背景透明度', 90, 0, 100, 1, '%'),
   immersiveBlur: range('背景模糊', 5, 0, 60, 1, '像素'),
@@ -180,6 +185,14 @@ export const groups = [
 const analyzerFields = Object.assign({}, ...groups.map(([, fields]) => fields))
 const fields = { ...general, ...source, ...analyzerFields }
 export const defaults = Object.freeze(Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, field.value])))
+
+/** Apply a named preset without inheriting any value from the previous preset. */
+export function applyPreset(current, id) {
+  const preset = presets.find(item => item.id === id)
+  if (!preset) return { ...current, preset: 'custom' }
+  const reset = Object.fromEntries(presetKeys.map(key => [key, defaults[key]]))
+  return { ...current, ...reset, ...preset.values, preset: id }
+}
 
 export function normalize(input = {}) {
   const result = { ...defaults }
