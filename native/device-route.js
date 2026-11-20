@@ -8,20 +8,34 @@ const LOCAL_HOSTNAME = new Set(['localhost', '127.0.0.1', '[::1]'])
 const PROXY_HEADERS = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-real-ip']
 
 export function allowsDeviceAudio(req) {
-  if (req.method !== 'POST' || !LOOPBACK.has(req.socket.remoteAddress)
+  if (req.method !== 'POST' || !LOOPBACK.has(req.socket?.remoteAddress)
     || PROXY_HEADERS.some(key => key in req.headers)) return false
   try {
     if (typeof req.headers.host !== 'string' || !LOCAL_HOSTNAME.has(new URL(`http://${req.headers.host}`).hostname)) return false
     if (req.headers['x-dsh-audio-reactive'] === 'desktop') {
-      // DSH Desktop strips Origin and Sec-Fetch-Site, and forwards its Host-issued auth cookie.
+      // DSH Desktop strips Origin and Sec-Fetch-Site and attaches its private host session cookie;
+      // real session credential verification is enforced separately via webServer auth + connection.admit().
       return req.headers.origin === undefined && req.headers['sec-fetch-site'] === undefined
-        && /(?:^|; )dsh-auth-[a-z\d-]+=[^;]+/i.test(req.headers.cookie ?? '')
     }
     if (req.headers['x-dsh-audio-reactive'] !== 'device' || req.headers['sec-fetch-site'] !== 'same-origin') return false
     const origin = new URL(req.headers.origin)
     return ['http:', 'https:'].includes(origin.protocol) && LOCAL_HOSTNAME.has(origin.hostname) && origin.host === req.headers.host
       && origin.origin === req.headers.origin
   } catch { return false }
+}
+
+/** Verify the real DSH session credential (Web token cookie or Desktop session cookie) and require an active owner Peer. */
+export function admitDeviceAudio(req, connection, peer) {
+  if (typeof connection?.admit !== 'function') return { status: 503 }
+  const admission = connection.admit(req)
+  if (!admission || 'rejection' in admission) return { status: admission?.rejection ?? 401 }
+  const resolved = admission.peer
+  if (!resolved || resolved.signal?.aborted) return { status: 401 }
+  if (peer !== undefined && (peer.signal?.aborted || peer.principal?.kind !== 'owner')) {
+    return { status: peer.signal?.aborted ? 401 : 403 }
+  }
+  if (resolved.principal?.kind !== 'owner') return { status: 403 }
+  return { status: 200, peer: resolved }
 }
 
 function status(res, code) {
@@ -39,11 +53,13 @@ function startCapture() {
   })
 }
 
-export function registerDeviceAudio(webServer, launch = startCapture, platform = process.platform) {
+export function registerDeviceAudio(webServer, connection, launch = startCapture, platform = process.platform) {
   let active
   const unregister = webServer.register({
-    kind: 'exact', path: PATH,
-    handler(req, res) {
+    kind: 'exact', path: PATH, auth: 'required',
+    handler(req, res, peer) {
+      const auth = admitDeviceAudio(req, connection, peer)
+      if (auth.status !== 200) { status(res, auth.status); return }
       if (!allowsDeviceAudio(req)) { status(res, 403); return }
       if (platform !== 'win32') { status(res, 501); return }
       if (active) { status(res, 409); return }
@@ -52,10 +68,13 @@ export function registerDeviceAudio(webServer, launch = startCapture, platform =
       const timeout = setTimeout(() => finish(503), 8000)
       const close = () => finish()
       active = close
+      const peerSignal = auth.peer?.signal
+      peerSignal?.addEventListener?.('abort', close, { once: true })
       function finish(errorCode) {
         if (active !== close) return
         active = undefined
         clearTimeout(timeout)
+        peerSignal?.removeEventListener?.('abort', close)
         req.off('aborted', close)
         res.off('close', close)
         if (child.exitCode === null && child.signalCode === null) child.kill()

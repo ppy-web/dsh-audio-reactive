@@ -21,7 +21,7 @@
 | DSH 录音／听写 | 官方语音输入将 `requesting`、`recording`、`transcribing`、`feedback` 映射到 `data-voice-activity`，采样节点留在组件内部，没有对外的分析信号。 | 观察当前对话输入区域与识别阶段，随挂载变化清理。`recording` 阶段在用户已授权的输入设备上另开一路共享麦克风采集驱动真实频谱（浏览器允许多个消费者共享同一输入设备，不干扰宿主录音；默认输入设备可在「声源设置 → 麦克风设备」覆盖）；`requesting`、`transcribing`、`feedback` 阶段显示静态状态并重置沉浸计时。可在「声源设置」关闭「语音输入（听写）」。 |
 | DSH 内音乐 | `Aliboder/dsh-music-panel@0.37.2` 在页面挂载两路 `audio.mp-audio-host`，切歌时可交叉淡化。 | 从正在播放的音频元素读取分析用媒体流，暂停或换歌时释放旧支路，播放器原本的音频输出保持独立。跨域音轨由浏览器决定是否允许读取。 |
 | 浏览器标签页／系统声音 | Web 可由用户在分享选择器中授权 `getDisplayMedia({ video: true, audio: true })`，实际音轨取决于浏览器、平台和被选中的分享范围。 | 单独提供「共享音频」开关，响应用户点击后请求，检查返回音轨，停止或撤回时释放全部轨道。只在本地分析，保留浏览器分享指示。远程 DSH 网页捕获的是打开该网页的设备。 |
-| Windows 本机设备声音 | WASAPI loopback 可以读取启动时的默认输出设备，Windows PowerShell 编译并运行随包提供的本机助手。 | 由用户在设置页启动，只接受同源本机请求或 DSH Desktop 的受认证本机转发。断开即停止。远程 Web 端用浏览器共享自己的设备声音。macOS 与 Linux 使用浏览器所支持的共享范围。 |
+| Windows 本机设备声音 | WASAPI loopback 可以读取启动时的默认输出设备，Windows PowerShell 编译并运行随包提供的本机助手。 | 由用户在设置页启动，路由声明 `auth: 'required'` 并调用宿主 `connection.admit(req)` 验证真实 DSH 会话凭据（Web 签名 Cookie 与 DSH Desktop 私密会话凭据均走同一认证链路，仅限活跃 `owner` 且限制本机回环、禁止代理转发与跨站请求）。断开或会话撤销即停止。远程 Web 端用浏览器共享自己的设备声音。macOS 与 Linux 使用浏览器所支持的共享范围。 |
 
 [TTS 客户端契约](https://github.com/ppy-web/dsh-plugin-xiaomi-mimo-tts/blob/main/src/client-api.ts) · [DSH 录音组件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.4/packages/experimental/client-ui-voice-input/src/client/VoiceInput.tsx) · [音乐面板源码](https://github.com/Aliboder/dsh-music-panel) · [浏览器共享 API](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia) · [WASAPI 官方文档](https://learn.microsoft.com/en-us/windows/win32/coreaudio/loopback-recording)
 
