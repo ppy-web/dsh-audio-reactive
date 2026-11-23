@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness Web 和 Desktop 的音频响应主题。流式朗读、`dsh-music-panel` 音乐、设备声音、宿主听写（语音输入）与麦克风都可以驱动 audioMotion 频谱。频谱按整个视口居中，放在对话内容后面。
 
-以本地最新 DSH `0.2.2-rc.5`（`2e39e70496`）源码为基线，相关插槽、DOM 锚点、主题令牌与宿主控件样式均按该版本核对。使用 Node.js 24.9+ 和 pnpm 11.28.5。
+以本地最新 DSH `0.2.3-alpha.2`（`4b399c39a6`）源码为基线，相关插槽、DOM 锚点、主题令牌与宿主控件样式均按该版本核对。使用 Node.js 24.9+ 和 pnpm 11.28.5（DSH `0.2.3-alpha.1` 起宿主本身要求 Node.js 24.22.3+ 或 26.13.1+）。
 
 ```sh
 pnpm install --frozen-lockfile
