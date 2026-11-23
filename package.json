@@ -1,6 +1,6 @@
 {
   "name": "dsh-audio-reactive",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "license": "AGPL-3.0-or-later",
   "description": "Audio-reactive visuals for DeepSeek Harness Web and Desktop",
   "homepage": "https://github.com/ppy-web/dsh-audio-reactive#readme",
