@@ -171,19 +171,36 @@ function Immersive({ runtime, active, source, settings, reducedMotion }) {
   </dialog>
 }
 
+let nextTargetId = 1
+const targetIds = new WeakMap()
+function targetKey(node) {
+  let id = targetIds.get(node)
+  if (!id) {
+    id = `dsh-ar-surface-${nextTargetId++}`
+    targetIds.set(node, id)
+  }
+  return id
+}
+
 export function Surface({ runtime }) {
-  const { settings, chat, frame, source, phase, immersive, previewing, reducedMotion } =
+  const { settings, chats, sidebar, frame, source, phase, immersive, previewing, reducedMotion } =
     useSyncExternalStore(runtime.subscribe, runtime.getSnapshot)
   const props = { source, settings, reducedMotion }
-  const target = chat ?? frame
+  const surfaces = [
+    ...(sidebar ? [{ target: sidebar, region: 'sidebar' }] : []),
+    ...(chats.length
+      ? chats.map(target => ({ target, region: 'surface' }))
+      : frame ? [{ target: frame, region: 'frame' }] : []),
+  ]
   const active = immersive && !!source
   return <>
     <Immersive runtime={runtime} active={active} {...props} />
-    {target && !active && !previewing && (source || phase) && createPortal(
-      <div data-dsh-ar-background="" aria-hidden="true" data-voice-phase={phase || undefined}
+    {!active && !previewing && (source || phase) && surfaces.map(({ target, region }) => createPortal(
+      <div data-dsh-ar-background="" data-dsh-ar-region={region} aria-hidden="true" data-voice-phase={phase || undefined}
+        data-dsh-ar-full-width={sidebar ? '' : undefined}
         style={{ '--dsh-ar-strength': settings.opacity / 100 }}>
         {source && !reducedMotion ? <Spectrum {...props} /> : <div className="dsh-ar-static" />}
-      </div>, target,
-    )}
+      </div>, target, targetKey(target),
+    ))}
   </>
 }

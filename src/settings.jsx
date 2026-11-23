@@ -342,6 +342,7 @@ export function Settings({ runtime }) {
       {renderField('enabled', general.enabled)}
       {renderField('preset', general.preset, { choices: presetChoices, hint: '选择内置预设或你保存的效果' })}
       {renderField('opacity', general.opacity)}
+      {renderField('showInSidebar', general.showInSidebar, { hint: '开启后全宽频谱会延伸到左侧边栏后面' })}
       {presetManageRow}
     </div>
   </>

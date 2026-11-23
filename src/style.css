@@ -1,5 +1,15 @@
-*:has(> [data-dsh-ar-background]) {
+div:has(> [data-dsh-ar-background]) {
   isolation: isolate;
+}
+
+div:has(> [data-dsh-ar-background][data-dsh-ar-region="surface"]),
+div:has(> [data-dsh-ar-background][data-dsh-ar-region="sidebar"]) {
+  position: relative;
+}
+
+div:has(> [data-dsh-ar-background][data-dsh-ar-region="sidebar"]) > :not([data-dsh-ar-background]) {
+  position: relative;
+  z-index: 1;
 }
 
 [data-dsh-ar-background] {
@@ -11,12 +21,40 @@
   opacity: var(--dsh-ar-strength, .18);
 }
 
+[data-dsh-ar-background][data-dsh-ar-region="surface"],
+[data-dsh-ar-background][data-dsh-ar-region="sidebar"] {
+  position: absolute;
+  clip-path: inset(0);
+}
+
+[data-dsh-ar-background][data-dsh-ar-region="sidebar"] {
+  z-index: 0;
+}
+
 [data-dsh-ar-background] .dsh-ar-spectrum,
 .dsh-ar-immersive .dsh-ar-spectrum {
   inset: 50% auto auto 50%;
   width: min(100%, 1600px);
   height: min(70%, 780px);
   transform: translate(-50%, -50%);
+}
+
+[data-dsh-ar-background][data-dsh-ar-region="surface"] .dsh-ar-spectrum,
+[data-dsh-ar-background][data-dsh-ar-region="sidebar"] .dsh-ar-spectrum {
+  position: fixed;
+  inset: 50vh auto auto 50vw;
+  width: min(100vw, 1600px);
+  height: min(70vh, 780px);
+}
+
+[data-dsh-ar-background][data-dsh-ar-full-width] .dsh-ar-spectrum {
+  width: 100vw;
+}
+
+[data-dsh-ar-background][data-dsh-ar-region="surface"] .dsh-ar-static,
+[data-dsh-ar-background][data-dsh-ar-region="sidebar"] .dsh-ar-static {
+  position: fixed;
+  inset: 0;
 }
 
 [data-dsh-ar-background] .dsh-ar-spectrum {

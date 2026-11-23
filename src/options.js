@@ -92,6 +92,7 @@ export const general = {
   enabled: flag('启用音频响应', true),
   preset: choice('效果预设', 'soft', presetChoices),
   opacity: range('能见度', 18, 5, 60, 1, '%'),
+  showInSidebar: flag('在侧边栏显示', true),
   immersive: flag('启用沉浸模式', true),
   idleSeconds: range('触发延时', 15, 1, 600, 1, '秒'),
   fadeMs: range('淡入淡出', 360, 0, 1500, 10, '毫秒'),

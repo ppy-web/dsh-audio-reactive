@@ -8,6 +8,38 @@ const CAPTURE = '[data-composer-seat] [data-voice-activity]'
 const HOST_DIALOG = '[role="dialog"][aria-modal="true"], dialog[open]:not([data-dsh-ar-immersive])'
 const ACTIVE_CAPTURE = new Set(['requesting', 'recording', 'transcribing'])
 const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll']
+const SKIP_SIDEBAR_COL = '[data-sidebar-mask], [data-rightbar-col], [data-shell-bottom], [data-shell-overlay], [data-shell-leading], [data-side]'
+const EMPTY_CHATS = []
+
+function visibleChats(win, doc) {
+  return [...doc.querySelectorAll(CHAT)].filter(node =>
+    !node.closest('[hidden], [inert]')
+    && node.getClientRects().length
+    && win.getComputedStyle?.(node)?.visibility !== 'hidden')
+}
+
+function sameNodes(a, b) {
+  return a.length === b.length && a.every((node, index) => node === b[index])
+}
+
+function findSidebar(win, doc, frame) {
+  if (!frame) return null
+  // The host's slot anchor uses display: contents. Mount on its rendered child.
+  const slot = frame.querySelector(':scope > * > [data-slot="sidebar"]')
+  let col = slot?.parentElement
+  if (!col) {
+    const children = [...frame.children]
+    const toggle = doc.querySelector('[data-sidebar-toggle]')
+    col = (toggle && children.find(child => child.contains?.(toggle)))
+      || children.find(child => !child.matches?.(SKIP_SIDEBAR_COL)
+        && !child.querySelector?.('[data-global-panel], [data-conversation-content]'))
+  }
+  if (!col?.clientWidth) return null
+  const root = (slot ?? col).firstElementChild
+  if (!root || root.closest?.('[hidden], [inert]') || !root.getClientRects?.().length
+    || win.getComputedStyle?.(root)?.visibility === 'hidden') return null
+  return root
+}
 
 function loadSettings(win) {
   try {
@@ -34,7 +66,7 @@ export function createRuntime(win, doc) {
   let armedAt
   let started = false
   let snapshot = {
-    settings: loadSettings(win), chat: null, frame: null, source: null, sourceKind: '', phase: '',
+    settings: loadSettings(win), chats: EMPTY_CHATS, sidebar: null, frame: null, source: null, sourceKind: '', phase: '',
     deviceStatus: 'off', micStatus: 'off', musicWaiting: false,
     nativeDevice: supportsNativeDevice(win, doc),
     immersive: false, previewing: false, reducedMotion: motion.matches, saveFailed: false,
@@ -55,13 +87,16 @@ export function createRuntime(win, doc) {
     if (!settings.enabled || doc.hidden) {
       armedAt = undefined
       mic.read({})
-      publish({ chat: null, frame: null, source: null, sourceKind: '', phase: '', immersive: false, reducedMotion: motion.matches })
+      publish({ chats: EMPTY_CHATS, sidebar: null, frame: null, source: null, sourceKind: '', phase: '', immersive: false, reducedMotion: motion.matches })
       return
     }
-    const chat = [...doc.querySelectorAll(CHAT)].find(node => !node.closest('[hidden], [inert]') && node.getClientRects().length) ?? null
+    const foundChats = visibleChats(win, doc)
+    const chats = foundChats.length === 0 ? EMPTY_CHATS : sameNodes(foundChats, snapshot.chats) ? snapshot.chats : foundChats
     const frame = doc.querySelector('[data-shell-overlay]')?.parentElement ?? null
-    const capture = chat?.querySelector(CAPTURE)?.getAttribute('data-voice-activity')
-    const phase = ACTIVE_CAPTURE.has(capture) ? capture : ''
+    const sidebar = settings.showInSidebar ? findSidebar(win, doc, frame) : null
+    const capture = chats.map(node => node.querySelector(CAPTURE)?.getAttribute('data-voice-activity'))
+      .find(value => ACTIVE_CAPTURE.has(value))
+    const phase = capture ?? ''
     let source = null
     let sourceKind = ''
     const panel = music.read()
@@ -93,7 +128,7 @@ export function createRuntime(win, doc) {
     const now = win.performance.now()
     if (!blocked && (armedAt === undefined || source !== snapshot.source)) armedAt = now
     publish({
-      chat, frame, source, sourceKind, phase, musicWaiting: panel.waiting,
+      chats, sidebar, frame, source, sourceKind, phase, musicWaiting: panel.waiting,
       reducedMotion: motion.matches, previewing: !!doc.querySelector('[data-dsh-ar-settings]'),
       immersive: armedAt !== undefined && now - armedAt >= settings.idleSeconds * 1000,
     })
@@ -175,7 +210,7 @@ export function createRuntime(win, doc) {
         win.removeEventListener('storage', onStorage)
         motion.removeEventListener('change', onVisibility)
         dismiss()
-        publish({ chat: null, frame: null, source: null, sourceKind: '', phase: '' })
+        publish({ chats: EMPTY_CHATS, sidebar: null, frame: null, source: null, sourceKind: '', phase: '' })
       }
     },
   }

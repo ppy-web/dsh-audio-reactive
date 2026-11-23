@@ -116,7 +116,7 @@ test('immersion requires continuous PCM and idle time, and exits on activity, pa
   assert.equal(runtime.getSnapshot().source, null)
   assert.equal(runtime.getSnapshot().immersive, false)
   dispose()
-  assert.equal(runtime.getSnapshot().chat, null)
+  assert.deepEqual(runtime.getSnapshot().chats, [])
   assert.equal(runtime.getSnapshot().phase, '')
 })
 
@@ -284,4 +284,101 @@ test('valid Chinese UI choices persist, and invalid limits stay safe for Web Aud
   assert.equal(normalize({ micDevice: 'mic-123' }).micDevice, 'mic-123')
   assert.equal(normalize({ micDevice: 123 }).micDevice, '')
   assert.equal(normalize({ micDevice: 'x'.repeat(300) }).micDevice, '')
+})
+
+test('split-pane conversations expose all visible chat containers and ignore hidden sidebars', () => {
+  const fixture = browserFixture()
+  let rightVisibility = 'visible'
+  let rightVoicePhase
+  const rightChat = {
+    getClientRects: () => [{}],
+    closest: () => null,
+    querySelector: () => ({ getAttribute: () => rightVoicePhase }),
+  }
+  fixture.win.getComputedStyle = node => ({ visibility: node === rightChat ? rightVisibility : 'visible' })
+  fixture.doc.querySelectorAll = () => [fixture.chat, rightChat]
+
+  const runtime = createRuntime(fixture.win, fixture.doc)
+  const dispose = runtime.start()
+  assert.deepEqual(runtime.getSnapshot().chats, [fixture.chat, rightChat])
+
+  // Dictation started in the right-hand embedded conversation updates the shared voice phase.
+  rightVoicePhase = 'recording'
+  fixture.at(1000)
+  assert.equal(runtime.getSnapshot().phase, 'recording')
+
+  // Collapsing the right sidebar hides its container via visibility: hidden without unmounting.
+  rightVoicePhase = undefined
+  rightVisibility = 'hidden'
+  fixture.at(2000)
+  assert.deepEqual(runtime.getSnapshot().chats, [fixture.chat])
+
+  dispose()
+  assert.deepEqual(runtime.getSnapshot().chats, [])
+})
+
+test('left sidebar receives the background surface only when showInSidebar is enabled and sidebar is visible', () => {
+  const fixture = browserFixture()
+  let sidebarVisibility = 'visible'
+  const toggle = {}
+  const sidebarRoot = {
+    getClientRects: () => [{}],
+    closest: () => null,
+  }
+  const sidebarCol = {
+    contains: node => node === toggle,
+    clientWidth: 280,
+  }
+  const sidebarSlot = {
+    parentElement: sidebarCol,
+    firstElementChild: sidebarRoot,
+    getClientRects: () => [],
+  }
+  sidebarCol.firstElementChild = sidebarSlot
+  const frame = {
+    children: [sidebarCol],
+    querySelector: selector => selector === ':scope > * > [data-slot="sidebar"]' ? sidebarSlot : null,
+  }
+  fixture.win.getComputedStyle = node => ({ visibility: node === sidebarRoot ? sidebarVisibility : 'visible' })
+  fixture.doc.querySelector = selector => {
+    if (selector === '[data-shell-overlay]') return { parentElement: frame }
+    if (selector === '[data-sidebar-toggle]') return toggle
+    return null
+  }
+
+  const runtime = createRuntime(fixture.win, fixture.doc)
+  const dispose = runtime.start()
+  assert.equal(runtime.getSnapshot().sidebar, sidebarRoot)
+
+  runtime.setSettings({ ...defaults, showInSidebar: false })
+  assert.equal(runtime.getSnapshot().sidebar, null)
+
+  runtime.setSettings({ ...defaults, showInSidebar: true })
+  assert.equal(runtime.getSnapshot().sidebar, sidebarRoot)
+
+  sidebarVisibility = 'hidden'
+  fixture.at(1000)
+  assert.equal(runtime.getSnapshot().sidebar, null)
+
+  sidebarVisibility = 'visible'
+  sidebarCol.clientWidth = 0
+  fixture.at(1500)
+  assert.equal(runtime.getSnapshot().sidebar, null)
+  sidebarCol.clientWidth = 280
+
+  // Older DSH builds without the slot anchor or toggle use AppFrame column order.
+  const mask = { matches: selector => selector.includes('[data-sidebar-mask]') }
+  const centerCol = {
+    matches: () => false,
+    querySelector: selector => (selector.includes('[data-conversation-content]') ? fixture.chat : null),
+  }
+  sidebarCol.firstElementChild = sidebarRoot
+  frame.children = [mask, sidebarCol, centerCol]
+  frame.querySelector = () => null
+  fixture.doc.querySelector = selector => (selector === '[data-shell-overlay]' ? { parentElement: frame } : null)
+  fixture.at(2000)
+  assert.equal(runtime.getSnapshot().sidebar, sidebarRoot)
+
+  dispose()
+  assert.equal(runtime.getSnapshot().sidebar, null)
 })
